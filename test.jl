@@ -62,7 +62,7 @@ function hnscore!(post_list, tick)
     return post_list
 end
 
-
+# sort only first 1500
 function sort_toplist(post_list)
     toplist = sort(post_list, rev=true, by=(post -> post.score))
     return toplist
@@ -80,6 +80,8 @@ function draw_arrival_rate(tick, ticks_per_day, arrival_rate_mean=LAMBDA; alpha=
     return rand(dist)
 end
 
+# try using data for sampling
+
 
 function tick()
 
@@ -90,9 +92,12 @@ end
 
 l = [draw_arrival_rate(100, 1440) for i in 1:100]
 
-histogram(l)
+using Turing
 
 using Plots
+Plots.plotly()
+histogram(l)
+
 
 post_list = [Post(rand(Uniform(0, 1)), 1, 0, 6, 0) for i in 1:100]
 attention_list = generate_attention(100)
@@ -102,7 +107,11 @@ toplist = sort_toplist(post_list)
 
 post_list
 
-
+# Wie ist Qualität verteilt?
+# korreliert mit votes?
+# baseline: wie schnell entwickeln sich Posts? -> "Steile" der Kurve
+# mehr votes auf der front page -> mehr qualität?
+# qualität nur proxy? 
 
 # votes + age -> wie verhalten sie sich in Bezug auf score?
 
