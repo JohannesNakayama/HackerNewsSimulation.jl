@@ -1,4 +1,7 @@
 using Distributions
+using Turing
+using Plots
+Plots.plotly()
 
 # params (computed from empirical data)
 LAMBDA = 0.6882627
@@ -27,7 +30,7 @@ end
 
 
 function generate_attention(n) 
-    pois = Poisson(5)
+    pois = Poisson(10)
     return rand(pois, n)
 end
 
@@ -39,9 +42,13 @@ end
 function user_interaction!(post_list, attention_list) 
     for att in attention_list
         for i in 1:att
-            post_list[i].views += 1
-            if post_list[i].quality > 0.5
-                post_list[i].votes += 1
+            if i <= length(post_list)
+                post_list[i].views += 1
+                if rand(Uniform(0, 1)) < 0.001 * post_list[i].quality
+                    post_list[i].votes += 1
+                end
+            else
+                break
             end
         end
     end
@@ -64,7 +71,7 @@ end
 
 # sort only first 1500
 function sort_toplist(post_list)
-    toplist = sort(post_list, rev=true, by=(post -> post.score))
+    toplist = sort(post_list, rev=true, by=(post -> (post.score, post.votes)))
     return toplist
 end
 
@@ -83,23 +90,52 @@ end
 # try using data for sampling
 
 
-function tick()
-
-    
-
+function tick!(model::Model)
+    model.tick += 1
+    # add new posts
+    arrival_rate = draw_arrival_rate(model.tick, 1440)
+    for i in 1:arrival_rate
+        push!(
+            model.post_list, 
+            Post(
+                length(model.post_list) + 1, 
+                rand(Uniform(0, 1)),
+                1, 
+                0,
+                model.tick,
+                0.0
+            )
+        )
+    end
+    hnscore!(model.post_list, copy(model.tick))
+    newest = length(model.post_list) >= 1500 ? model.post_list[1:1500] : model.post_list
+    model.top_list = sort_toplist(newest)
+    attention_top = generate_attention(10)
+    attention_new = generate_attention(100)
+    user_interaction!(model.top_list, attention_top)
+    user_interaction!(model.post_list, attention_new)
+    return model
 end
 
 
-l = [draw_arrival_rate(100, 1440) for i in 1:100]
+model = Model([], [], 0, 10)
 
-using Turing
+for i in 1:2880
+    tick!(model)
+end
 
-using Plots
-Plots.plotly()
+for p in model.top_list[1:30]
+    print(p, "\n")
+end
+
+model.post_list
+
+l = [draw_arrival_rate(i, 1440) for i in 1:1440]
 histogram(l)
 
 
-post_list = [Post(rand(Uniform(0, 1)), 1, 0, 6, 0) for i in 1:100]
+
+post_list = [Post(i, rand(Uniform(0, 1)), 1, 0, 6, 1.0) for i in 1:100]
 attention_list = generate_attention(100)
 user_interaction!(post_list, attention_list)
 hnscore!(post_list, 8)
