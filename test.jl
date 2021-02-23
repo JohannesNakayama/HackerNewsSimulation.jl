@@ -1,7 +1,10 @@
+module LoadyStuffs
+
 using Distributions
-using Turing
-using Plots
-Plots.plotly()
+using DataFrames
+# using Turing
+# using Plots
+# Plots.plotly()
 
 # params (computed from empirical data)
 LAMBDA = 0.6882627
@@ -10,10 +13,10 @@ SIGMA = 0.4203008
 
 
 mutable struct Model
-    post_list
-    top_list
-    tick
-    n_users
+    post_list::AbstractArray
+    top_list::AbstractArray
+    tick::Int
+    n_users::Int
 end
 
 
@@ -26,7 +29,7 @@ mutable struct Post
     score::Float64
 end
 
-
+end
 
 
 function generate_attention(n) 
@@ -44,7 +47,7 @@ function user_interaction!(post_list, attention_list)
         for i in 1:att
             if i <= length(post_list)
                 post_list[i].views += 1
-                if rand(Uniform(0, 1)) < 0.001 * post_list[i].quality
+                if rand(Uniform(0, 1)) < post_list[i].quality
                     post_list[i].votes += 1
                 end
             else
@@ -90,12 +93,29 @@ end
 # try using data for sampling
 
 
-function tick!(model::Model)
+function log_postlist!(log_dataframe, tick_array, tick::Int)
+    tick_dataframe = DataFrame(tick_array)
+    tick_dataframe[:, :tick] .= tick
+    log_dataframe = vcat(log_dataframe, tick_dataframe)
+    return log_dataframe
+end
+
+
+function log_toplist!(log_dataframe, tick_array, tick)
+    tick_dataframe = DataFrame(tick_array)
+    tick_dataframe[:, :tick] .= tick
+    tick_dataframe[:, :rank] = 1:length(tick_array)
+    log_dataframe = vcat(log_dataframe, tick_dataframe)
+    return log_dataframe
+end
+
+
+function tick!(model::LoadyStuffs.Model, postlistlog, toplistlog)
     model.tick += 1
     # add new posts
     arrival_rate = draw_arrival_rate(model.tick, 1440)
     for i in 1:arrival_rate
-        push!(
+        pushfirst!(
             model.post_list, 
             Post(
                 length(model.post_list) + 1, 
@@ -111,37 +131,26 @@ function tick!(model::Model)
     newest = length(model.post_list) >= 1500 ? model.post_list[1:1500] : model.post_list
     model.top_list = sort_toplist(newest)
     attention_top = generate_attention(10)
-    attention_new = generate_attention(100)
+    attention_new = generate_attention(1)
     user_interaction!(model.top_list, attention_top)
     user_interaction!(model.post_list, attention_new)
-    return model
+    postlistlog = log_postlist!(postlistlog, model.post_list, model.tick)
+    toplistlog = log_toplist!(toplistlog, model.top_list, model.tick)
+    return model, postlistlog, toplistlog
 end
 
 
-model = Model([], [], 0, 10)
-
+model = LoadyStuffs.Model([], [], 0, 10)
+postlistlog = DataFrame()
+toplistlog = DataFrame()
 for i in 1:2880
-    tick!(model)
+    model, postlistlog, toplistlog = tick!(model, postlistlog, toplistlog)
 end
 
-for p in model.top_list[1:30]
-    print(p, "\n")
-end
 
-model.post_list
+postlistlog
+toplistlog
 
-l = [draw_arrival_rate(i, 1440) for i in 1:1440]
-histogram(l)
-
-
-
-post_list = [Post(i, rand(Uniform(0, 1)), 1, 0, 6, 1.0) for i in 1:100]
-attention_list = generate_attention(100)
-user_interaction!(post_list, attention_list)
-hnscore!(post_list, 8)
-toplist = sort_toplist(post_list)
-
-post_list
 
 # Wie ist Qualität verteilt?
 # korreliert mit votes?
