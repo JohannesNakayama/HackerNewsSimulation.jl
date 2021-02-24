@@ -1,10 +1,9 @@
-module LoadyStuffs
-
 using Distributions
 using DataFrames
+
 # using Turing
-# using Plots
-# Plots.plotly()
+using Plots
+Plots.plotly()
 
 # params (computed from empirical data)
 LAMBDA = 0.6882627
@@ -29,7 +28,6 @@ mutable struct Post
     score::Float64
 end
 
-end
 
 
 function generate_attention(n) 
@@ -110,7 +108,7 @@ function log_toplist!(log_dataframe, tick_array, tick)
 end
 
 
-function tick!(model::LoadyStuffs.Model, postlistlog, toplistlog)
+function tick!(model::Model, postlistlog, toplistlog)
     model.tick += 1
     # add new posts
     arrival_rate = draw_arrival_rate(model.tick, 1440)
@@ -140,16 +138,22 @@ function tick!(model::LoadyStuffs.Model, postlistlog, toplistlog)
 end
 
 
-model = LoadyStuffs.Model([], [], 0, 10)
+model = Model([], [], 0, 10)
 postlistlog = DataFrame()
 toplistlog = DataFrame()
 for i in 1:2880
     model, postlistlog, toplistlog = tick!(model, postlistlog, toplistlog)
 end
 
+using Feather
 
+Feather.write(joinpath("data", "tmp_post.feather"), postlistlog)
+Feather.write(joinpath("data", "tmp_top.feather"), toplistlog)
 postlistlog
 toplistlog
+
+
+# arrival rates funktionieren noch nicht wie sie sollen
 
 
 # Wie ist Qualität verteilt?
